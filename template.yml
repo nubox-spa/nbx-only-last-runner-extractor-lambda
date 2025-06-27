@@ -69,8 +69,8 @@ Resources:
         Type: AWS::Serverless::Function
         Properties:
             FunctionName: !Join ["-", [!Ref envName, "only-last-runner-extractor", "lambda"]]
-            #Handler: newrelic_lambda_wrapper.handler
-            Handler: app.lambda_handler
+            Handler: newrelic_lambda_wrapper.handler
+            #Handler: app.lambda_handler
             CodeUri: src/
             Runtime: python3.11
             Tags:
