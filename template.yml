@@ -1,0 +1,111 @@
+# yaml-language-server: $schema=.\\schema\\schema.json
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: Lambda to run only last process
+
+Parameters:
+    envName:
+        Type: String
+        Default: dev
+        Description: Environment name
+
+    SubnetIds:
+        Type: String
+        Description: The list of Subnet IDs
+        Default: "subnet-xxxxxxxxx,subnet-yyyyyyyyy"
+
+    SecurityGroupIds:
+        Type: String
+        Description: The list of Security Group IDs
+        Default: "sg-xxxxxxxxx"
+
+    NRAccountId:
+        Type: String
+        Description: Your New Relic account ID; necessary for distributed tracing.
+        Default: "3357944"
+
+    deployedVersion:
+        Type: String
+        Default: 1.0.0
+        Description: Application version
+    
+    EndpointUrl:
+        Type: String
+        Description: The endpoint URL to call
+        Default: "https://whb3526bbf1e3872b2d9.free.beeceptor.com"
+    
+    HttpMethod:
+        Type: String
+        Description: HTTP method to use
+        Default: "POST"
+        AllowedValues: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    
+    RequestTimeout:
+        Type: String
+        Description: Request timeout in seconds
+        Default: "30"
+    
+    RequestHeaders:
+        Type: String
+        Description: JSON string of request headers
+        Default: '{"User-Agent": "Lambda-Endpoint-Caller/1.0"}'
+    
+    RequestData:
+        Type: String
+        Description: JSON string of request data (for POST/PUT requests)
+        Default: ""
+    
+Globals:
+    Function:
+        Timeout: 900
+        MemorySize: 512
+        Environment:
+            Variables:
+                deployedVersion: !Ref deployedVersion
+
+Resources:
+    nbxOnlyLastRunnerLambda:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: !Join ["-", [!Ref envName, "only-last-runner-extractor", "lambda"]]
+            #Handler: newrelic_lambda_wrapper.handler
+            Handler: app.lambda_handler
+            CodeUri: src/
+            Runtime: python3.11
+            Tags:
+                producto:extr: si
+                enviromentName: !Ref envName
+                approle: BACKEND
+            VpcConfig:
+                SecurityGroupIds:
+                    Fn::Split:
+                        - ","
+                        - Ref: SecurityGroupIds
+                SubnetIds:
+                    Fn::Split:
+                        - ","
+                        - Ref: SubnetIds
+            Architectures:
+                - x86_64
+            Environment:
+                Variables:
+                    envName: !Ref envName
+                    NEW_RELIC_LAMBDA_HANDLER: app.lambda_handler
+                    NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
+                    NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
+                    NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
+                    NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+                    NEW_RELIC_SERVERLESS_MODE_ENABLED: true
+                    ENDPOINT_URL: !Ref EndpointUrl
+                    HTTP_METHOD: !Ref HttpMethod
+                    REQUEST_TIMEOUT: !Ref RequestTimeout
+                    REQUEST_HEADERS: !Ref RequestHeaders
+                    REQUEST_DATA: !Ref RequestData
+            Layers:
+                - 'arn:aws:lambda:us-east-1:451483290750:layer:NewRelicPython313:5'
+
+Outputs:
+    LambdaName:
+        Description: Lambda Name
+        Value: !Ref nbxOnlyLastRunnerLambda
