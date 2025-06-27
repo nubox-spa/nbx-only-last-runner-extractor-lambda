@@ -33,7 +33,7 @@ Parameters:
     EndpointUrl:
         Type: String
         Description: The endpoint URL to call
-        Default: "https://whb3526bbf1e3872b2d9.free.beeceptor.com"
+        Default: "https://extr-develop.test-nubox.com:40043/nbxsiiextmdd/api/tasks/only-last-scheduled"
     
     HttpMethod:
         Type: String
