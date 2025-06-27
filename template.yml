@@ -13,12 +13,12 @@ Parameters:
     SubnetIds:
         Type: String
         Description: The list of Subnet IDs
-        Default: "subnet-xxxxxxxxx,subnet-yyyyyyyyy"
+        Default: "subnet-0a580ba9452c92937,subnet-02710fd9cbc1a884e"
 
     SecurityGroupIds:
         Type: String
         Description: The list of Security Group IDs
-        Default: "sg-xxxxxxxxx"
+        Default: "sg-0f7a70e6566b3dfdb"
 
     NRAccountId:
         Type: String
