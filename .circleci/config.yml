@@ -1,0 +1,189 @@
+# Recipes Template System:
+# For set the template to the repo, you must to set the templateToken variable to the template you want to use.
+# note: Do not remove the variable from comments
+#
+# For backend Projects:
+#   back/bff
+#   back/service
+#   back/async
+#   back/lib
+#   back/archetype
+#
+# For frontend Projects:
+#   front/libcomponent
+#   front/libutil
+#   front/mfe
+#   front/root
+#   front/archetype-mfe
+#   front/archetype-root
+# =========================
+# templateToken=function/lambda-without-test
+# workingbranch=--branch master
+# =========================
+version: 2.1
+setup: true
+orbs:
+    continuation: circleci/continuation@0.2.0
+    slack: circleci/slack@4.3.0
+
+jobs:
+    setup-template:
+        docker:
+            - image: "cimg/base:stable"
+        steps:
+            - checkout
+
+            - run:
+                  name: Read This Template Token
+                  command: |
+                      touch new-vars
+                      echo 'export TEMPLATE_PATH=$(cat .circleci/config.yml | grep "^#.templateToken" | sed -e "s/.*=//g" | sed "s/[\r\"]//g")' >> new-vars
+                      echo 'export GIT_WORKING_BRANCH=$(cat .circleci/config.yml | grep "^#.workingbranch" | sed -e "s/.*=//g" | sed "s/[\r\"]//g")' >> new-vars
+                      echo 'export CIRCLE_BRANCH_FIXED=$(echo ${CIRCLE_BRANCH} | sed -e "s/feature\/.*/feature/g" -e "s/bugfix\/.*/bugfix/g" -e "s/release\/.*/release/g" -e "s/hotfix\/.*/hotfix/g" -e "s/preprod\/.*/preprod/g" -e "s/demoday\/.*/demoday/g")' >> new-vars
+                      echo 'export COMMENT=$(git rev-list --format=oneline --max-count=1 $CIRCLE_SHA1 | sed "s/[^ ]* //" | sed "s/\"//g" | sed "s/\\\\//g")' >> new-vars
+                      echo 'export GIT_COMMIT_USERNAME=$(git log --format="%an" -n 1)' >> new-vars
+                      echo 'export WORKFLOW_NAME=$(curl --request GET --url https://circleci.com/api/v2/project/github/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/job/${CIRCLE_BUILD_NUM} --header "Circle-Token: ${CIRCLE_TOKEN}" | jq -r ".latest_workflow.name")' >> new-vars       
+                      
+                      cat new-vars >> $BASH_ENV           
+                      source $BASH_ENV
+            - run:
+                  name: Download Latest Templates
+                  command: |
+                      echo $(cat .circleci/config.yml | grep "^#.workingbranch" | sed -e "s/.*=//g" | sed "s/[\r\"]//g")
+                      git clone ${GIT_WORKING_BRANCH} "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/nubox-spa/sas-templates-circleci"
+                      echo 'export TEMPLATE_FILES="sas-templates-circleci/${TEMPLATE_PATH}/${CIRCLE_BRANCH_FIXED}"' >> new-vars
+                      echo $TEMPLATE_FILES="sas-templates-circleci/${TEMPLATE_PATH}/${CIRCLE_BRANCH_FIXED}"
+                      cat new-vars >> $BASH_ENV
+                      source $BASH_ENV
+                      if [ ! -d "${TEMPLATE_FILES}" ]; then
+                        echo 'No se pudo encontrar el directorio'
+                        exit 1;
+                      fi
+
+            - run:
+                  name: Copy Template Files to Root Directory
+                  command: |
+                      
+                      pwd
+                      cp -R "${TEMPLATE_FILES}/." "./"
+                      ls -la
+
+            - run:
+                  name: Read Template Version
+                  command: |
+                      echo 'export VERSION_TEMPLATE=$(cat yml/config.yml | grep "^#.VersionTemplate" | sed -e "s/#.//g" | sed "s/[\r\"]//g")' >> new-vars
+                      cat new-vars >> $BASH_ENV           
+                      source $BASH_ENV            
+
+
+            - persist_to_workspace:
+                  root: .
+                  paths:
+                      - "*"
+
+                ###############################
+                # no-productive notifications #
+                ###############################
+            - slack/notify:
+                  event: fail
+                  branch_pattern: feature\/.*|bugfix\/.*|develop|preprod\/.*|hotfix\/.*|release\/.*|demoday\/.*
+                  channel: $SLACK_CHANNEL_NO_PRODUCTIVE
+                  template: FAIL_NUBOX
+            - slack/notify:
+                  event: pass
+                  branch_pattern: feature\/.*|bugfix\/.*|develop|preprod\/.*|hotfix\/.*|release\/.*|demoday\/.*
+                  channel: $SLACK_CHANNEL_NO_PRODUCTIVE
+                  template: SUCCESS_NUBOX
+                ###############################
+                # productive notifications   #
+                ###############################
+            - slack/notify:
+                  event: fail
+                  branch_pattern: master
+                  channel: $SLACK_CHANNEL_PRODUCTIVE
+                  template: FAIL_NUBOX
+            - slack/notify:
+                  event: pass
+                  branch_pattern: master
+                  channel: $SLACK_CHANNEL_PRODUCTIVE
+                  template: SUCCESS_NUBOX
+
+    run-template:
+        executor: continuation/default
+        steps:
+            - checkout
+
+            - attach_workspace:
+                  at: .
+            - run: cat new-vars >> $BASH_ENV
+            - run: source $BASH_ENV
+
+            - run:
+                  name: Print Version Template
+                  command: |
+                      echo $VERSION_TEMPLATE                 
+
+            - run:
+                  name: Create Parameter json
+                  command: |
+                      repo_type="unknown"
+                      if [ -e build.gradle ]; then 
+                        repo_type="java"
+                      else
+                        if [ -e package.json ]; then
+                          repo_type="javascript"
+                        fi
+                      fi
+                      
+                      export TEST_ENV="hello world"
+                      echo '{ "repo-type": "'$repo_type'" }' >> /home/circleci/test.json
+
+            - continuation/continue:
+                  configuration_path: yml/config.yml
+                  parameters: /home/circleci/test.json
+
+
+
+                ###############################
+                # no-productive notifications #
+                ###############################
+            - slack/notify:
+                  event: fail
+                  branch_pattern: feature\/.*|bugfix\/.*|develop|preprod\/.*|hotfix\/.*|release\/.*|demoday\/.*
+                  channel: $SLACK_CHANNEL_NO_PRODUCTIVE
+                  template: FAIL_NUBOX
+            - slack/notify:
+                  event: pass
+                  branch_pattern: feature\/.*|bugfix\/.*|develop|preprod\/.*|hotfix\/.*|release\/.*|demoday\/.*
+                  channel: $SLACK_CHANNEL_NO_PRODUCTIVE
+                  template: SUCCESS_NUBOX
+                ###############################
+                # productive notifications   #
+                ###############################
+            - slack/notify:
+                  event: fail
+                  branch_pattern: master
+                  channel: $SLACK_CHANNEL_PRODUCTIVE
+                  template: FAIL_NUBOX
+            - slack/notify:
+                  event: pass
+                  branch_pattern: master
+                  channel: $SLACK_CHANNEL_PRODUCTIVE
+                  template: SUCCESS_NUBOX
+
+workflows:
+    base-configuration:
+        jobs:
+            - setup-template:
+                  context:
+                      - git_hub
+                      - slack_template
+                      - slack_notify
+                      - global
+            - run-template:
+                  requires:
+                      - setup-template
+                  context:
+                      - slack_template
+                      - slack_notify
+                      - global
