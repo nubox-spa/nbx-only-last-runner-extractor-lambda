@@ -72,7 +72,7 @@ Resources:
             Handler: newrelic_lambda_wrapper.handler
             #Handler: app.lambda_handler
             CodeUri: src/
-            Runtime: python3.11
+            Runtime: python3.13
             Tags:
                 producto:extr: si
                 enviromentName: !Ref envName
